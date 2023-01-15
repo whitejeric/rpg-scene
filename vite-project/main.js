@@ -1,40 +1,26 @@
 import './style.css'
-import spark from './spark'
-import camera_pipe from './camera_pipe'
 import * as THREE from 'three';
+
+import spark from './public/local/spark'
+import dolly from './public/local/dolly'
+import custom_model from './public/local/custom_model';
+
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls'
 import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CameraHelper } from 'three';
-import custom_model from './custom_model';
+
 
 //TODO create init function
   
   const scene = new THREE.Scene();
-  const left_torch_pos = [-8,8,-2];
-  const right_torch_pos = [8,8,-2];
-  const spark_count = 3;
-  const table_height = 4.2;
-  
-  // const C = new THREE.LineCurve(new THREE.Vector3(0,0,0), new THREE.Vector3(0,10,0));
-  // const C_geometry = new THREE.TubeGeometry(C, 100, 2, 8, true);
-  // const C_material = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true, side: THREE.DoubleSide} );
-  // const tube = new THREE.Mesh(C_geometry, C_material);
-  // scene.add(tube)
-  const dolly_points = [
-    new THREE.Vector3(0,10,10),
-    new THREE.Vector3(0,9,2),
-    new THREE.Vector3(0,7,1)
-  ]
-  const camera_dolly = new camera_pipe(dolly_points);
-  
-  //container for all visuals
-
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-  //fov, aspect ratio, view frustrum user, view frust furthest point
-
+  const camera = new THREE.PerspectiveCamera(
+    60, 
+    window.innerWidth/window.innerHeight, 
+    0.1, 
+    1000);
   const renderer = new THREE.WebGLRenderer({
     canvas: document.querySelector('#bg'),
   });
@@ -43,17 +29,37 @@ import custom_model from './custom_model';
   renderer.shadowMap.enabled = true;
   renderer.outputEncoding = THREE.sRGBEncoding;
   
-
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   
-  //move the camera back
-
   const composer = new EffectComposer( renderer );
   //post proc effect
   const renderPass = new RenderPass( scene, camera );
   composer.addPass( renderPass );
 
+
+
+  const left_torch_pos = [-8,8,-2];
+  const right_torch_pos = [8,8,-2];
+  const spark_count = 3;
+  const TABLE_HEIGHT = 4.2;
+  
+  const dolly_arcs = [
+    [
+      new THREE.Vector3(0,10,10),
+      new THREE.Vector3(0,9,2),
+      new THREE.Vector3(0,7,1)
+    ],
+    [ 
+      new THREE.Vector3(0,7,1),
+      new THREE.Vector3(0,8,1),
+      new THREE.Vector3(1,7,1)
+    ]
+  ]
+
+
+  const camera_dolly = new dolly(dolly_arcs);
+  
 /*
 FLOOR
 TODO clean up
@@ -64,9 +70,11 @@ const floor = new THREE.Mesh(geometry, material);
 scene.add(floor);
 
 const MODELS = []
+const FOCAL_POINTS =[];
 
 /**
  * initializes the custom model object for each imported 3d model in the scene
+ * TODO add torches
  * @author EW
  * @date 2023-01-14
  */
@@ -77,22 +85,41 @@ function init_models(){
     [0.5,0,0], 
     [0,5,0], 
     './models/Small_Table.glb',
-    'table'
+    'table',
+    true
     );
 
   const book = new custom_model(
       [2, 2, 2], 
       [0, -Math.PI/8, 0], 
-      [2, table_height, -1], 
-      [0,5,0], 
+      [2, TABLE_HEIGHT, -1], 
+      [2, TABLE_HEIGHT + 1, -1], 
       '/models/Open_Book.glb',
-      'book'
+      'book',
+      true
     );
 
   MODELS.push(table,book)
 }
 
+/**
+ * establishes which models will be focusable and where
+ * TODO add start camera position, feed dolly camera setups
+ * @author EW
+ * @date 2023-01-14
+ */
+function init_focal_points(){
+  for (let i = 0; i < MODELS.length; i++){
+    let m = MODELS[i]
+    if (m.focusable){
+      FOCAL_POINTS.push({name: m.name, angle: new THREE.Vector3(...m.view_position)})
+    }
+  }
+  console.log(FOCAL_POINTS)
+}
+
 init_models()
+init_focal_points()
 
 const loader = new GLTFLoader();
 
@@ -207,7 +234,7 @@ for (let j = 0; j < spark_count; j++){
 BACKGROUND
 TODO replace background
 */
-const bgTexture = new THREE.TextureLoader().load('space.jpg')
+// const bgTexture = new THREE.TextureLoader().load('space.jpg')
 // scene.background = bgTexture;
 
 camera_dolly.draw(scene)
@@ -224,13 +251,30 @@ camera_dolly.draw(scene)
  * TODO asdasd
  * @date 2023-01-14
  */
+
+function getScrollPercent(){
+  var h = document.documentElement, 
+        b = document.body,
+        st = 'scrollTop',
+        sh = 'scrollHeight';
+    return (h[st]||b[st]) / ((h[sh]||b[sh]) - h.clientHeight) * 100;
+}
+const view_epsilon = 0.3
 function moveCamera (){
-  const t = document.body.getBoundingClientRect().top/1000;
-  // const b = document.body.getBoundingClientRect().top/1000;
-  console.log(t)
-  let camera_on_dolly = camera_dolly.move_camera(Math.abs(t))
-  camera.position.copy(camera_on_dolly[0])
-  // camera.lookAt(camera_on_dolly[1])
+  const scroll_p = getScrollPercent()
+  const t = scroll_p/(100/camera_dolly.curve_count)
+
+  if (t < camera_dolly.curve_count){
+    let viewfinder = camera_dolly.move_camera(t)
+    camera.position.copy(viewfinder[0])
+    let t_delta = Math.abs(Math.ceil(t) - t)
+    // console.log(t_delta, CAMERA_POSITIONS[Math.floor(t)].name,t_delta > view_epsilon)
+    if (t_delta > view_epsilon){
+      //if camera still eps away from next target focal point, continue looking at it
+      camera.lookAt(FOCAL_POINTS[Math.floor(t)].angle)
+    }
+    
+}
 }
 
 moveCamera()
@@ -293,3 +337,4 @@ function animate(){
 
 
 animate();
+
