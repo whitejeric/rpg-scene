@@ -1,17 +1,35 @@
 import './style.css'
 import spark from './spark'
+import camera_pipe from './camera_pipe'
 import * as THREE from 'three';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls'
 import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CameraHelper } from 'three';
+import custom_model from './custom_model';
 
+//TODO create init function
+  
   const scene = new THREE.Scene();
   const left_torch_pos = [-8,8,-2];
   const right_torch_pos = [8,8,-2];
   const spark_count = 3;
   const table_height = 4.2;
+  
+  // const C = new THREE.LineCurve(new THREE.Vector3(0,0,0), new THREE.Vector3(0,10,0));
+  // const C_geometry = new THREE.TubeGeometry(C, 100, 2, 8, true);
+  // const C_material = new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: true, side: THREE.DoubleSide} );
+  // const tube = new THREE.Mesh(C_geometry, C_material);
+  // scene.add(tube)
+  const dolly_points = [
+    new THREE.Vector3(0,10,10),
+    new THREE.Vector3(0,9,2),
+    new THREE.Vector3(0,7,1)
+  ]
+  const camera_dolly = new camera_pipe(dolly_points);
+  
   //container for all visuals
 
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -28,8 +46,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  camera.position.setZ(10);
-  camera.position.setY(10);
   
   //move the camera back
 
@@ -39,47 +55,68 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   composer.addPass( renderPass );
 
 /*
-TORUS SHAPE
+FLOOR
+TODO clean up
 */
 const geometry = new THREE.BoxGeometry(100, 1, 100);
 const material = new THREE.MeshStandardMaterial({color: 0xFF6347});
 const floor = new THREE.Mesh(geometry, material);
 scene.add(floor);
 
+const MODELS = []
 
-const sceneMeshes= new THREE.Mesh();
+/**
+ * initializes the custom model object for each imported 3d model in the scene
+ * @author EW
+ * @date 2023-01-14
+ */
+function init_models(){
+  const table = new custom_model(
+    [5,5,5], 
+    [0, Math.PI/2, 0], 
+    [0.5,0,0], 
+    [0,5,0], 
+    './models/Small_Table.glb',
+    'table'
+    );
+
+  const book = new custom_model(
+      [2, 2, 2], 
+      [0, -Math.PI/8, 0], 
+      [2, table_height, -1], 
+      [0,5,0], 
+      '/models/Open_Book.glb',
+      'book'
+    );
+
+  MODELS.push(table,book)
+}
+
+init_models()
+
 const loader = new GLTFLoader();
 
-loader.load( '/models/Small Table.glb', 
-  function ( gltf ) { //onload
-    let model = gltf.scene;
-    model.scale.set(5, 5, 5);
-    model.rotation.set(0, Math.PI/2, 0);
-    model.position.set(0.5, 0, 0);
-    scene.add(model)
-  }, 
-  undefined, //onprogress
-  function ( error ) { //on error
-	  console.error( error );
-  } 
-);
-
-loader.load( '/models/Open Book.glb', 
-  function ( gltf ) { //onload
-    let model = gltf.scene;
-    model.scale.set(2, 2, 2);
-    model.rotation.set(0, -Math.PI/8, 0);
-    model.position.set(2, table_height, -1);
-    scene.add(model)
-  }, 
-  undefined, //onprogress
-  function ( error ) { //on error
-	  console.error( error );
-  } 
-);
+// loads all 3d models into scene through GLTFLoader
+MODELS.forEach(e => {
+  loader.load( e.file, 
+    function ( gltf ) { //onload
+      let m = gltf.scene;
+      m.scale.set(...e.scale);
+      m.rotation.set(...e.rotation);
+      m.position.set(...e.position);
+      scene.add(m)
+      console.log('loaded model: ' + e.name)
+    }, 
+    undefined, //onprogress
+    function ( error ) { //on error
+      console.error( error );
+    } 
+  );
+})
 
 /*
 LIGHT
+TODO create torch class
 */
 const rightLight = new THREE.PointLight(0xFFA500, 2);
 rightLight.position.set(...right_torch_pos); //... spread operator
@@ -104,6 +141,7 @@ loader.load( '/models/Torch.glb',
 
 const leftLight = new THREE.PointLight(0xFFA500, 2);
 leftLight.position.set(...left_torch_pos);
+
 loader.load( '/models/Torch.glb', 
   function ( gltf ) { //onload
     let model = gltf.scene;
@@ -126,6 +164,7 @@ const ambLight = new THREE.AmbientLight(0xff5f3f, 1);
 scene.add(leftLight, rightLight, bottomLight); //,ambLight
 /*
 HELPERS
+TODO remove
 */
 //shows where the light is
 const l_lightHelper = new THREE.PointLightHelper(leftLight);
@@ -134,7 +173,7 @@ const r_lightHelper = new THREE.PointLightHelper(rightLight);
 const gridHelper = new THREE.GridHelper(200, 50);
 scene.add(r_lightHelper, l_lightHelper, gridHelper);
 //allows camera controls
-const controls = new OrbitControls(camera, renderer.domElement);
+// const controls = new OrbitControls(camera, renderer.domElement);
 //shows 3d axis
 
 const axesHelper = new THREE.AxesHelper( 50 ); 
@@ -142,7 +181,9 @@ scene.add( axesHelper );
 
 /*
 SPARKS
+TODO: add to torch class
 */
+
 let sparks_list_left = Array(spark_count)
 let sparks_list_right = Array(spark_count)
 for (let i = 0; i < spark_count; i++){
@@ -150,21 +191,26 @@ for (let i = 0; i < spark_count; i++){
   sparks_list_right[i] = new spark({r: 0.09, w: 3, h:3}, right_torch_pos.map((e) => e), 1, {color:0xb04125});
   scene.add(sparks_list_right[i].get())
 }
+
 for (let j = 0; j < spark_count; j++){
   // scene.add(new spark({r: 0.15, w: 3, h:3}, [0,0,0], 6, {color:0xffffff}).get());
   sparks_list_left[j] = new spark({r: 0.09, w: 3, h:3}, left_torch_pos.map((e) => e), 1, {color:0xb04125});
+  
   scene.add(sparks_list_left[j].get())
 }
 
 
 
+
+
 /*
-TEXTURES
+BACKGROUND
+TODO replace background
 */
 const bgTexture = new THREE.TextureLoader().load('space.jpg')
 // scene.background = bgTexture;
 
-
+camera_dolly.draw(scene)
 
 //asdasd
 
@@ -179,21 +225,16 @@ const bgTexture = new THREE.TextureLoader().load('space.jpg')
  * @date 2023-01-14
  */
 function moveCamera (){
-  const t = document.body.getBoundingClientRect().top;
-  //getBoundClientRect gets the dimensions of the body, top is the distance we 
-  //are from the top of the body in the dom
-
-
-  camera.position.z = t * -0.01;
-  camera.position.x = t * -0.0002;
-  camera.position.y = t * -0.0002;
+  const t = document.body.getBoundingClientRect().top/1000;
+  // const b = document.body.getBoundingClientRect().top/1000;
+  console.log(t)
+  let camera_on_dolly = camera_dolly.move_camera(Math.abs(t))
+  camera.position.copy(camera_on_dolly[0])
+  // camera.lookAt(camera_on_dolly[1])
 }
 
-
-function clickwel(){
-  console.log('asdasd')
-}
-// document.body.onscroll = moveCamera
+moveCamera()
+document.body.onscroll = moveCamera
 // document.getElementById('welcome').onclick = clickwel
 
 window.addEventListener('resize', onWindowResize, false)
@@ -207,11 +248,7 @@ function onWindowResize() {
     camera.updateProjectionMatrix()
     renderer.setSize(window.innerWidth, window.innerHeight)
 }
-/*
-ANIMATE LOOP
-*/
-camera.rotation.x = -.5;
-let frame = 0
+
 /**
  * desc
  * @author asdasd
@@ -222,11 +259,13 @@ function light_flicker(intensity){
   return (intensity + Math.random() - 0.4)%5; 
 }
 
+
 /**
  * desc
  * @author asdasd
  * @date 2023-01-14
  */
+let frame = 0
 function animate(){
   frame = (frame+=1)%60
   requestAnimationFrame(animate);

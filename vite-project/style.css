@@ -28,6 +28,7 @@ main {
   
   display: grid;
   grid-template-columns: repeat(12, 1fr);
+  visibility: hidden;
 }
 
 h1, h2, h3, blockquote {

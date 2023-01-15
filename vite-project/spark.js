@@ -1,32 +1,34 @@
 import * as THREE from 'three';
 
 class spark {
-    // constructor(){
-    //     let geometry = new THREE.SphereGeometry(0.25, 24, 24);
-    //     let material = new THREE.MeshStandardMaterial({color: 0xFF6347});
-    //     this.S = new THREE.Mesh(geometry, material);
-    
-    //     let [x,y,z] = Array(3).fill().map(() => THREE.MathUtils.randFloatSpread(100));
-    //     this.S.position.set(-x,y,z);
-    // }
+    /**
+     * desc
+     * @author EW
+     * @date 2023-01-14
+     * @param { object }    s   contains radius, width and height of spark
+     * @param { Array }     o   origin of spark
+     * @param { float }     spread  amount of randomness to placement
+     * @param { object }    color   
+     */
     O = []
-    constructor (
-        s, 
-        o,  //origin
-        spread, 
-        color){
-            //size of the star object, origin of placement, scatter/spread amount
+    constructor (s, o, spread, color){
+            
             let geometry = new THREE.SphereGeometry(s.r, s.w, s.h);
             let material = new THREE.MeshStandardMaterial(color);
             this.Spark = new THREE.Mesh(geometry, material);
-        
-            // let [x,y,z] = Array(3).fill().map   (() => THREE.MathUtils.randFloatSpread(spread));
+            // console.log(o)
             o.forEach((e, i) => {
                 o[i] = e + (THREE.MathUtils.randFloatSpread(spread));
                 this.O[i] = o[i];
             });
             this.Spark.position.set(o[0],o[1],o[2]);
     }
+    /**
+     * applies a motion to the spark according to current torch light level
+     * @author EW
+     * @date 2023-01-14
+     * @param { float } intensity   current luminosity of the parent torch
+     */
     wiggle(intensity){
         let wiggle_offset = (Math.random(10) * Math.abs(intensity-5)/8);
         let y = this.Spark.position.y + wiggle_offset
@@ -48,9 +50,3 @@ class spark {
     }
   }
 export default spark
-
-// constructor (
-//     s = {x: 0.25, y: 24, z: 24}, 
-//     o = [0,0,0],  //origin
-//     spread = 100, 
-//     color = {color:0xffffff}){
