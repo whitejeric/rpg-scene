@@ -15,12 +15,27 @@ class dolly {
 	 */
 	constructor(arc_list) {
 		for (let i = 0; i < arc_list.length; i++) {
-			var a = arc_list[i];
-			var arc = new THREE.QuadraticBezierCurve3(a[0], a[1], a[2]);
+			if (arc_list[i].length > 2) {
+				var a = arc_list[i][0];
+				var b = arc_list[i][1];
+				var c = arc_list[i][2];
+			} else {
+				//interpolate a third point in the middle to smooth out the tube
+				var a = arc_list[i][0];
+				var c = arc_list[i][1];
+				var b = new THREE.Vector3();
+				b.lerpVectors(a, c, 0.8);
+				var len = b.length();
+				b.setLength(len + 1);
+				console.log(a, b, c);
+			}
+
+			var arc = new THREE.QuadraticBezierCurve3(a, b, c);
+			console.log(arc);
 			this.track.add(arc);
 			this.curve_count += 1;
 		}
-		this.step = this.curve_count / 100;
+		this.step = this.curve_count / 1000;
 	}
 	get() {
 		return this.track;
@@ -29,7 +44,7 @@ class dolly {
 		let checkered = [0x00ffff, 0xff0000];
 		let flip_color = true;
 		this.track.curves.forEach((curve) => {
-			let C_geometry = new THREE.TubeGeometry(curve, 10, 0.5, 8, false);
+			let C_geometry = new THREE.TubeGeometry(curve, 10, 0.15, 8, true);
 			let C_material = new THREE.MeshBasicMaterial({
 				color: flip_color ? checkered[0] : checkered[1],
 				wireframe: true,

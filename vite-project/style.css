@@ -15,6 +15,16 @@ canvas {
 	font-style: normal;
 }
 
+#info_panel {
+	position: fixed;
+	top: 10%;
+	left: 10%;
+	width: 100px;
+	height: 100px;
+	background-color: aliceblue;
+	z-index: 1000;
+}
+
 main {
 	width: 100vw;
 	color: white;
@@ -23,6 +33,7 @@ main {
 	width: 100%;
 	margin: 0px auto;
 	/* padding: 120px 0px; */
+	height: 10000px;
 
 	display: grid;
 	grid-template-columns: repeat(12, 1fr);
