@@ -5,35 +5,42 @@ class spark {
 	 * desc
 	 * @author EW
 	 * @date 2023-01-14
-	 * @param { object }    s   contains radius, width and height of spark
-	 * @param { Array }     o   origin of spark
+	 * @param { object }    dim   	dimensions; contains radius, width and height of spark
+	 * @param { Array }     origin  origin of spark, [x,y,z]
 	 * @param { float }     spread  amount of randomness to placement
 	 * @param { object }    color
 	 */
 	O = [];
-	constructor(s, o, spread, color) {
-		let geometry = new THREE.SphereGeometry(s.r, s.w, s.h);
+	constructor(
+		dim = { radius: 1, width: 1, height: 1 },
+		origin = [1, 1, 1],
+		spread = 10,
+		color = '0xffffff'
+	) {
+		let geometry = new THREE.SphereGeometry(dim.radius, dim.width, dim.height);
 		let material = new THREE.MeshStandardMaterial(color);
 		this.Spark = new THREE.Mesh(geometry, material);
-		// console.log(o)
-		o.forEach((e, i) => {
-			o[i] = e + THREE.MathUtils.randFloatSpread(spread);
-			this.O[i] = o[i];
+		origin.forEach((e, i) => {
+			origin[i] = e + THREE.MathUtils.randFloatSpread(spread);
+			this.O[i] = origin[i];
 		});
-		this.Spark.position.set(o[0], o[1], o[2]);
+		this.Spark.position.set(origin[0], origin[1], origin[2]);
 	}
 	/**
 	 * applies a motion to the spark according to current torch light level
 	 * @author EW
 	 * @date 2023-01-14
 	 * @param { float } intensity   current luminosity of the parent torch
+	 * @param { float } factor   	semi-magic number for creating randomness
 	 */
-	wiggle(intensity) {
-		let wiggle_offset = (Math.random(10) * Math.abs(intensity - 5)) / 8;
+	wiggle(intensity, factor = 25) {
+		let wiggle_offset =
+			(Math.random(factor) * Math.abs(intensity - factor * 0.5)) /
+			(factor * 0.8);
 		let y = this.Spark.position.y + wiggle_offset;
 		let x = this.Spark.position.x - wiggle_offset * Math.sin(intensity);
 
-		if (y < Math.abs(this.O[1] + 8)) {
+		if (y < Math.abs(this.O[1] + factor * 0.8)) {
 			this.Spark.position.setY(y);
 			this.Spark.position.setX(x);
 		} else {

@@ -24,83 +24,59 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({
 	canvas: document.querySelector('#bg'),
 });
-//target location to render is bg ie the whole background
-renderer.physicallyCorrectLights = true;
-renderer.shadowMap.enabled = true;
-renderer.outputEncoding = THREE.sRGBEncoding;
+function render_init() {
+	//target location to render is bg ie the whole background
+	renderer.physicallyCorrectLights = true;
+	renderer.shadowMap.enabled = true;
+	renderer.outputEncoding = THREE.PCFSoftShadowMap;
 
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.setPixelRatio(window.devicePixelRatio);
+	renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function onWindowResize() {
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+render_init();
 
 const composer = new EffectComposer(renderer);
 //post proc effect
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-const left_light_position = [-8, 8, -2];
-const right_light_position = [8, 8, -2];
-const spark_count = 3;
-const TABLE_HEIGHT = 4.2; //from 0 on Y
-const t_D = { height: 4.2, x: 5.0, z: 3.3 };
-
-// const dolly_arcs = [
-// 	[
-// 		new THREE.Vector3(t_D.x * 0.0, t_D.height * 2.5, t_D.z * 3.3),
-// 		new THREE.Vector3(t_D.x * 0.0, t_D.height * 2.0, t_D.z * 0.33),
-// 	],
-// 	[
-// 		new THREE.Vector3(t_D.x * 0.0, t_D.height * 2.0, t_D.z * 0.33),
-// 		new THREE.Vector3(t_D.x * 1, t_D.height * 1.2, t_D.z * 1),
-// 	],
-// 	[
-// 		new THREE.Vector3(t_D.x * 1, t_D.height * 1.2, t_D.z * 1),
-// 		new THREE.Vector3(t_D.x * -1, t_D.height * 1.3, t_D.z * -1),
-// 	],
-
-// 	[
-// 		new THREE.Vector3(t_D.x * -1, t_D.height * 1.3, t_D.z * -1),
-// 		new THREE.Vector3(t_D.x * -1, t_D.height * 1.4, t_D.z * 1),
-// 	],
-// 	[
-// 		new THREE.Vector3(t_D.x * -1, t_D.height * 1.4, t_D.z * 1),
-// 		new THREE.Vector3(t_D.x * 1, t_D.height * 1.4, t_D.z * -1),
-// 	],
-// ];
 let STOP = false;
 document.getElementById('free_cam').addEventListener('click', () => {
-	STOP = true;
-	const controls = new OrbitControls(camera, renderer.domElement);
-	camera.position.set(0, 20, 10);
-	controls.update();
+	if (!STOP) {
+		const controls = new OrbitControls(camera, renderer.domElement);
+		camera.position.set(0, 20, 10);
+		controls.update();
+	}
+	STOP = !STOP;
 });
 
-// const camera_dolly = new dolly(dolly_arcs);
-// camera_dolly.draw(scene);
-document
-	.getElementById('show_wires')
-	.addEventListener('click', () => camera_dolly.draw(scene));
+const t_D = { height: 4.2, x: 5.0, z: 3.3 };
+const left_light_position = [-8, 8, -2];
+const right_light_position = [8, 8, -2];
+const top_light_position = [0, t_D.height + 5, -5];
+const spark_count = 3;
+const torch_max_intensity = 50;
+const TABLE_HEIGHT = 4.2; //from 0 on Y
 
-/*
-FLOOR
-TODO clean up
-*/
-const geometry = new THREE.BoxGeometry(100, 1, 100);
-const material = new THREE.MeshStandardMaterial({ color: 0x006347 });
-const floor = new THREE.Mesh(geometry, material);
-scene.add(floor);
+const rightLight = new THREE.PointLight(0xffa500, torch_max_intensity);
+const leftLight = new THREE.PointLight(0xffa500, torch_max_intensity);
+const topLight = new THREE.PointLight(0xffa500, torch_max_intensity);
+const bottomLight = new THREE.PointLight(0xfbceb1, 0.5);
+const ambLight = new THREE.AmbientLight(0xff5f3f, 1);
+const left_torch_sparks = Array(spark_count);
+const right_torch_sparks = Array(spark_count);
 
 const MODELS = [];
-const FOCAL_POINTS = [
-	{
-		name: 'camera_start',
-		position: new THREE.Vector3(0, 10, 2),
-		viewing_position: new THREE.Vector3(5, 9, 2),
-	},
-];
 
 /**
  * initializes the custom model object for each imported 3d model in the scene
- * TODO add torches
  * @author EW
  * @date 2023-01-14
  */
@@ -118,7 +94,7 @@ function init_models() {
 	const book = new custom_model(
 		[2, 2, 2],
 		[0, -Math.PI / 8, 0],
-		[t_D.x - 2, t_D.height, t_D.z - 2],
+		[t_D.x * 0.5, t_D.height + 2, t_D.z * 0],
 		[t_D.x - 2.5, t_D.height + 0.5, t_D.z - 2.5],
 		'/models/Open_Book.glb',
 		'book',
@@ -161,159 +137,93 @@ function init_models() {
 		true
 	);
 
+	//some random models scattered around
 	for (let i = 0; i < 20; i++) {
 		const A = new custom_model();
 		A.random(1, 360, { x: 20, y: t_D.height, z: 20 });
 		MODELS.push(A);
 	}
 
-	MODELS.push(book, left_torch, right_torch);
+	MODELS.push(book, left_torch, right_torch, table);
 }
-
-/**
- * establishes which models will be focusable and where
- * TODO add start camera position, feed dolly camera setups
- * @author EW
- * @date 2023-01-14
- */
-function init_focal_points() {
-	for (let i = 0; i < MODELS.length; i++) {
-		let m = MODELS[i];
-		if (m.focusable) {
-			FOCAL_POINTS.push({
-				name: m.name,
-				position: new THREE.Vector3(...m.position),
-				viewing_position: new THREE.Vector3(...m.view),
-			});
-		}
-	}
-	for (let j = 1; j <= FOCAL_POINTS.length - 1; j++) {
-		FOCAL_POINTS[j].previous = FOCAL_POINTS[j - 1].position;
-	}
-	FOCAL_POINTS[0].previous = FOCAL_POINTS[FOCAL_POINTS.length - 1].position;
-	console.log(FOCAL_POINTS);
-}
-
-init_models();
-init_focal_points();
-
-const focal_arcs = [];
-const follow_arcs = [];
-
-for (let k = 0; k < FOCAL_POINTS.length; k++) {
-	focal_arcs.push([FOCAL_POINTS[k].previous, FOCAL_POINTS[k].position]);
-	follow_arcs.push([
-		FOCAL_POINTS[k].viewing_position.clone(),
-		FOCAL_POINTS[k].previous.clone(),
-	]);
-}
-
-const view_dolly = new dolly(focal_arcs);
-view_dolly.draw(scene);
-const camera_dolly = new dolly(follow_arcs);
-
-const loader = new GLTFLoader();
-
 // loads all 3d models into scene through GLTFLoader
-MODELS.forEach((e) => {
-	loader.load(
-		e.file,
-		function (gltf) {
-			//onload
-			let m = gltf.scene;
-			m.scale.set(...e.scale);
-			m.rotation.set(...e.rotation);
-			m.position.set(...e.position);
-			scene.add(m);
-			console.log('loaded model: ' + e.name + m.position);
-		},
-		undefined, //onprogress
-		function (error) {
-			//on error
-			console.error(error);
-		}
-	);
-});
-
-/*
-LIGHT
-TODO create torch class
-*/
-const rightLight = new THREE.PointLight(0xffa500, 2);
-rightLight.position.set(...right_light_position); //... spread operator
-
-const leftLight = new THREE.PointLight(0xffa500, 2);
-leftLight.position.set(...left_light_position);
-
-const bottomLight = new THREE.PointLight(0xfbceb1, 4);
-bottomLight.position.set(0, 1, -5);
-const ambLight = new THREE.AmbientLight(0xff5f3f, 1);
-scene.add(leftLight, rightLight, bottomLight, ambLight); //,ambLight
-/*
-!!!!!!!!!!!!HELPERS !!!!!!!!!!!!!!!
-TODO remove
-*/
-//shows where the light is
-// const l_lightHelper = new THREE.PointLightHelper(leftLight);
-// const r_lightHelper = new THREE.PointLightHelper(rightLight);
-//3d grid
-const gridHelper = new THREE.GridHelper(200, 50);
-scene.add(gridHelper);
-//allows camera controls
-
-//shows 3d axis
-
-const axesHelper = new THREE.AxesHelper(50);
-scene.add(axesHelper);
-
-/*
-SPARKS
-TODO: add to torch class
-*/
-
-let sparks_list_left = Array(spark_count);
-let sparks_list_right = Array(spark_count);
-for (let i = 0; i < spark_count; i++) {
-	// scene.add(new spark({r: 0.15, w: 3, h:3}, [0,0,0], 6, {color:0xffffff}).get());
-	sparks_list_right[i] = new spark(
-		{ r: 0.09, w: 3, h: 3 },
-		right_light_position.map((e) => e),
-		1,
-		{ color: 0xb04125 }
-	);
-	scene.add(sparks_list_right[i].get());
+function load_models() {
+	const loader = new GLTFLoader();
+	MODELS.forEach((e) => {
+		loader.load(
+			e.file,
+			function (gltf) {
+				//onload
+				let m = gltf.scene;
+				m.scale.set(...e.scale);
+				m.rotation.set(...e.rotation);
+				m.position.set(...e.position);
+				m.traverse(function (node) {
+					if (node.isMesh) {
+						node.castShadow = true;
+						node.receiveShadow = true;
+					}
+				});
+				scene.add(m);
+				console.log('loaded model: ' + e.name + m.position);
+			},
+			undefined, //onprogress
+			function (error) {
+				//on error
+				console.error(error);
+			}
+		);
+	});
 }
 
-for (let j = 0; j < spark_count; j++) {
-	// scene.add(new spark({r: 0.15, w: 3, h:3}, [0,0,0], 6, {color:0xffffff}).get());
-	sparks_list_left[j] = new spark(
-		{ r: 0.09, w: 3, h: 3 },
-		left_light_position.map((e) => e),
-		1,
-		{ color: 0xb04125 }
-	);
-
-	scene.add(sparks_list_left[j].get());
+function init_floor() {
+	const geometry = new THREE.BoxGeometry(100, 1, 100);
+	const material = new THREE.MeshStandardMaterial({ color: 0x3c280d });
+	const floor = new THREE.Mesh(geometry, material);
+	floor.receiveShadow = true;
+	scene.add(floor);
 }
 
-/*
-BACKGROUND
-TODO replace background
-*/
-// const bgTexture = new THREE.TextureLoader().load('space.jpg')
-// scene.background = bgTexture;
+function init_lights() {
+	rightLight.position.set(...right_light_position);
+	rightLight.castShadow = true;
+	leftLight.position.set(...left_light_position);
+	leftLight.castShadow = true;
+	topLight.position.set(...top_light_position);
+	topLight.castShadow = true;
+	bottomLight.position.set(0, t_D.height - 1, -2);
+	scene.add(leftLight, rightLight, bottomLight, topLight); //,ambLight
+}
 
-//asdasd
+function init_helpers() {
+	const l_lightHelper = new THREE.PointLightHelper(leftLight);
+	const r_lightHelper = new THREE.PointLightHelper(rightLight);
+	// scene.add(l_lightHelper, r_lightHelper);
+	const gridHelper = new THREE.GridHelper(200, 50);
+	// scene.add(gridHelper);
+	const axesHelper = new THREE.AxesHelper(50);
+	// scene.add(axesHelper);
+}
 
-/**
- * desc
- * @author asdasd
- * * asd
- * ? asdasd
- * ! asdasd
- * TODO asdasd
- * @date 2023-01-14
- */
+function init_sparks(sparks_list, light_position) {
+	for (let i = 0; i < sparks_list.length; i++) {
+		sparks_list[i] = new spark(
+			{ radius: 0.09, width: 3, height: 3 },
+			light_position.map((e) => e),
+			1,
+			{ color: 0xb04125 }
+		);
+		scene.add(sparks_list[i].get());
+	}
+}
+
+init_sparks(left_torch_sparks, left_light_position);
+init_sparks(right_torch_sparks, right_light_position);
+init_models();
+load_models();
+init_lights();
+init_helpers();
+init_floor();
 
 function getScrollPercent() {
 	var h = document.documentElement,
@@ -324,40 +234,27 @@ function getScrollPercent() {
 	document.getElementById('scroll_percentage').innerHTML = res;
 	return res;
 }
-const view_epsilon = 0.3;
 
 /**
  * moves the camera along the dolly following a scroll action
  * @author EW
  * @date 2023-01-15
- */
-function moveCamera() {
-	const scroll_p = getScrollPercent();
-	const t = scroll_p / (100 / camera_dolly.curve_count);
+//  */
+// function moveCamera() {
+// 	const scroll_p = getScrollPercent();
+// 	const t = scroll_p / (100 / camera_dolly.curve_count);
 
-	if (1 < camera_dolly.curve_count && !STOP) {
-		let camera_position = camera_dolly.move_camera(frame / 100);
-		camera.position.copy(camera_position[0]);
-		let camera_focus = view_dolly.move_camera(frame / 100);
-		camera.lookAt(camera_focus[1]);
-		// console.log(t_delta, CAMERA_POSITIONS[Math.floor(t)].name,t_delta > view_epsilon)
-	}
-}
+// 	if (1 < camera_dolly.curve_count && !STOP) {
+// 		let camera_position = camera_dolly.move_camera(frame / 100);
+// 		camera.position.copy(camera_position[0]);
+// 		let camera_focus = view_dolly.move_camera(frame / 100);
+// 		camera.lookAt(camera_focus[1]);
+// 		// console.log(t_delta, CAMERA_POSITIONS[Math.floor(t)].name,t_delta > view_epsilon)
+// 	}
+// }
 
 // moveCamera();
 // document.body.onscroll = moveCamera;
-
-window.addEventListener('resize', onWindowResize, false);
-/**
- * desc
- * @author asdasd
- * @date 2023-01-14
- */
-function onWindowResize() {
-	camera.aspect = window.innerWidth / window.innerHeight;
-	camera.updateProjectionMatrix();
-	renderer.setSize(window.innerWidth, window.innerHeight);
-}
 
 /**
  * desc
@@ -366,36 +263,100 @@ function onWindowResize() {
  * @param { * } intensity
  */
 function light_flicker(intensity) {
-	return (intensity + Math.random() - 0.4) % 5;
+	return (
+		(Math.random(torch_max_intensity) + intensity * (Math.random(3) + 0.5)) %
+		torch_max_intensity
+	);
 }
 
-/**
- * desc
- * @author asdasd
- * @date 2023-01-14
- */
+function update_light(light, sparks) {
+	const L = light_flicker(light.intensity);
+	light.intensity = L;
+	light.distance = L + 10;
+	sparks.forEach((e) => {
+		e.wiggle(L);
+	});
+}
 
-function animate() {
-	frame = (frame += 1) % 600;
+const motion_dolly = new dolly([
+	[t_D.x * 1, t_D.height, t_D.z * 1],
+	[t_D.x * 1, t_D.height + 2, t_D.z * -1],
+	[t_D.x * -1, t_D.height + 1, t_D.z * -1],
+	[t_D.x * -1, t_D.height + 3, t_D.z * 1],
+]);
+const md_draw = motion_dolly.draw({ color: 0xffffff });
 
-	requestAnimationFrame(animate);
-	if (frame % 2 == 0) {
-		moveCamera();
-		let left = leftLight.intensity;
-		leftLight.intensity = light_flicker(left);
-		let right = rightLight.intensity;
-		rightLight.intensity = light_flicker(right);
-		sparks_list_right.forEach((element) => {
-			element.wiggle(right);
-		});
-		sparks_list_left.forEach((element) => {
-			element.wiggle(left);
-		});
+const FOCALS = [];
+MODELS.forEach((e) => {
+	FOCALS.push(e.position);
+});
+const focal_dolly = new dolly(FOCALS);
+const fd_draw = focal_dolly.draw();
+
+const outer_box = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+const mat = new THREE.MeshBasicMaterial({ color: 0x61120d, wireframe: true });
+const outer_cube = new THREE.Mesh(outer_box, mat);
+outer_cube.castShadow = true;
+scene.add(outer_cube);
+
+const inner_box = new THREE.SphereGeometry(0.1, 10, 10);
+const mat2 = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+const inner_sphere = new THREE.Mesh(inner_box, mat2);
+scene.add(inner_sphere);
+
+const outer_light = new THREE.PointLight(0xff0000, 50, 10);
+outer_light.castShadow = true;
+scene.add(outer_light);
+
+let draw_dollys = true;
+document.getElementById('show_wires').addEventListener('click', () => {
+	if (draw_dollys) {
+		scene.add(md_draw);
+		scene.add(fd_draw);
+	} else {
+		scene.remove(md_draw);
+		scene.remove(fd_draw);
 	}
-	//mouse follow
+	draw_dollys = !draw_dollys;
+});
 
+// const inner_light = new THREE.
+
+let frame2 = 0;
+//!box3 is bounding box
+function animate() {
+	frame = (frame += 1) % 1000;
+	frame2 = (frame2 += 1) % 12000;
+
+	let camera_position = motion_dolly.get_position(frame, 1000);
+	const old_length = camera_position.length();
+	const e = new THREE.Vector3();
+	e.copy(camera_position);
+	e.setLength(old_length + 3);
+	camera_position = motion_dolly.get_position(frame, 1000);
+	const camera_focus_point = focal_dolly.get_position(frame2, 12000);
+	outer_light.position.x = camera_focus_point.x;
+	outer_light.position.y = camera_focus_point.y + 0.5;
+	outer_light.position.z = camera_focus_point.z;
+	outer_cube.position.x = camera_focus_point.x;
+	outer_cube.position.y = camera_focus_point.y;
+	outer_cube.position.z = camera_focus_point.z;
+	inner_sphere.position.x = camera_focus_point.x;
+	inner_sphere.position.y = camera_focus_point.y + 0.25;
+	inner_sphere.position.z = camera_focus_point.z;
+	if (!STOP) {
+		camera.position.copy(e);
+		camera.lookAt(camera_focus_point);
+	}
+	if (frame % 2 == 0) {
+		update_light(leftLight, left_torch_sparks);
+	}
+	if (frame2 % 2 == 0) {
+		update_light(rightLight, right_torch_sparks);
+	}
+	requestAnimationFrame(animate);
 	composer.render();
 }
 //render loop, everytime scene is redrawn is called
-
+window.addEventListener('resize', onWindowResize, false);
 animate();

@@ -21,7 +21,7 @@ canvas {
 	left: 10%;
 	width: 100px;
 	height: 100px;
-	background-color: aliceblue;
+	background-color: 0;
 	z-index: 1000;
 }
 
