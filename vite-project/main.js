@@ -57,6 +57,8 @@ document.getElementById('free_cam').addEventListener('click', () => {
 	STOP = !STOP;
 });
 
+//asdasd
+
 const t_D = { height: 4.2, x: 5.0, z: 3.3 };
 const left_light_position = [-8, 8, -2];
 const right_light_position = [8, 8, -2];
