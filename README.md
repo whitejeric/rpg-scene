@@ -8,6 +8,6 @@ path set by said objects. <br/>
 Options:
 - camera wireframe, 
 - switch to a free view mode, 
-- and turn shadows off/on (greedy processes).<br/>
+- and turn shadows off/on 
 
 3d models courtesy of: [poly pizza user Quaternius](https://poly.pizza/u/Quaternius) <3.
