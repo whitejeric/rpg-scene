@@ -13,7 +13,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 //TODO create init function
-let frame = 0;
+const NUM_RANDOM_MODELS = 10;
+let ELAPSED_TIME = 0;
+let camera_loop_time = 2000;
+let focus_loop_time = 5000;
+let FREE_CAM = false;
+let SHADOWS_ON = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
 	60,
@@ -28,7 +33,7 @@ function render_init() {
 	//target location to render is bg ie the whole background
 	renderer.physicallyCorrectLights = true;
 	renderer.shadowMap.enabled = true;
-	renderer.outputEncoding = THREE.PCFSoftShadowMap;
+	renderer.outputEncoding = THREE.PCFShadowMap;
 
 	renderer.setPixelRatio(window.devicePixelRatio);
 	renderer.setSize(window.innerWidth, window.innerHeight);
@@ -46,16 +51,6 @@ const composer = new EffectComposer(renderer);
 //post proc effect
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
-
-let STOP = false;
-document.getElementById('free_cam').addEventListener('click', () => {
-	if (!STOP) {
-		const controls = new OrbitControls(camera, renderer.domElement);
-		camera.position.set(0, 20, 10);
-		controls.update();
-	}
-	STOP = !STOP;
-});
 
 //asdasd
 
@@ -76,7 +71,7 @@ const left_torch_sparks = Array(spark_count);
 const right_torch_sparks = Array(spark_count);
 
 const MODELS = [];
-
+const LIGHTS = [leftLight, rightLight, topLight, bottomLight];
 /**
  * initializes the custom model object for each imported 3d model in the scene
  * @author EW
@@ -90,14 +85,14 @@ function init_models() {
 		[0, 5, 0],
 		'./models/Small_Table.glb',
 		'table',
-		true
+		false
 	);
 
 	const book = new custom_model(
 		[2, 2, 2],
-		[0, -Math.PI / 8, 0],
-		[t_D.x * 0.5, t_D.height + 2, t_D.z * 0],
-		[t_D.x - 2.5, t_D.height + 0.5, t_D.z - 2.5],
+		[0, 0, 0],
+		[0, t_D.height, 0],
+		[t_D.x * 0.9, t_D.height, t_D.z - 2.5],
 		'/models/Open_Book.glb',
 		'book',
 		true
@@ -118,7 +113,7 @@ function init_models() {
 		],
 		'/models/Torch.glb',
 		'LTorch',
-		true
+		false
 	);
 
 	const right_torch = new custom_model(
@@ -136,18 +131,62 @@ function init_models() {
 		],
 		'/models/Torch.glb',
 		'LTorch',
-		true
+		false
 	);
-
-	//some random models scattered around
-	for (let i = 0; i < 20; i++) {
+	MODELS.push(left_torch, right_torch, table);
+	// some random models scattered around
+	let left_shift = -0.8;
+	let left_shift_amount = 1.8 / NUM_RANDOM_MODELS;
+	for (let i = 0; i < NUM_RANDOM_MODELS; i++) {
 		const A = new custom_model();
-		A.random(1, 360, { x: 20, y: t_D.height, z: 20 });
+		A.random(1, 360, { x: t_D.x * left_shift, y: t_D.height, z: t_D.z });
+		A.focusable = true;
+		left_shift = left_shift + left_shift_amount;
 		MODELS.push(A);
 	}
-
-	MODELS.push(book, left_torch, right_torch, table);
 }
+
+function init_floor() {
+	const geometry = new THREE.BoxGeometry(100, 1, 100);
+	const material = new THREE.MeshStandardMaterial({ color: 0x3c280d });
+	const floor = new THREE.Mesh(geometry, material);
+	floor.receiveShadow = true;
+	scene.add(floor);
+}
+
+function init_lights() {
+	rightLight.position.set(...right_light_position);
+	rightLight.castShadow = SHADOWS_ON;
+	leftLight.position.set(...left_light_position);
+	leftLight.castShadow = SHADOWS_ON;
+	topLight.position.set(...top_light_position);
+	topLight.castShadow = SHADOWS_ON;
+	bottomLight.position.set(0, t_D.height - 1, -2);
+	scene.add(leftLight, rightLight, bottomLight, topLight); //,ambLight
+}
+
+function init_helpers() {
+	const l_lightHelper = new THREE.PointLightHelper(leftLight);
+	const r_lightHelper = new THREE.PointLightHelper(rightLight);
+	// scene.add(l_lightHelper, r_lightHelper);
+	const gridHelper = new THREE.GridHelper(200, 50);
+	// scene.add(gridHelper);
+	const axesHelper = new THREE.AxesHelper(50);
+	// scene.add(axesHelper);
+}
+
+function init_sparks(sparks_list, light_position) {
+	for (let i = 0; i < sparks_list.length; i++) {
+		sparks_list[i] = new spark(
+			{ radius: 0.09, width: 3, height: 3 },
+			light_position.map((e) => e),
+			1,
+			{ color: 0xb04125 }
+		);
+		scene.add(sparks_list[i].get());
+	}
+}
+
 // loads all 3d models into scene through GLTFLoader
 function load_models() {
 	const loader = new GLTFLoader();
@@ -178,47 +217,6 @@ function load_models() {
 	});
 }
 
-function init_floor() {
-	const geometry = new THREE.BoxGeometry(100, 1, 100);
-	const material = new THREE.MeshStandardMaterial({ color: 0x3c280d });
-	const floor = new THREE.Mesh(geometry, material);
-	floor.receiveShadow = true;
-	scene.add(floor);
-}
-
-function init_lights() {
-	rightLight.position.set(...right_light_position);
-	rightLight.castShadow = true;
-	leftLight.position.set(...left_light_position);
-	leftLight.castShadow = true;
-	topLight.position.set(...top_light_position);
-	topLight.castShadow = true;
-	bottomLight.position.set(0, t_D.height - 1, -2);
-	scene.add(leftLight, rightLight, bottomLight, topLight); //,ambLight
-}
-
-function init_helpers() {
-	const l_lightHelper = new THREE.PointLightHelper(leftLight);
-	const r_lightHelper = new THREE.PointLightHelper(rightLight);
-	// scene.add(l_lightHelper, r_lightHelper);
-	const gridHelper = new THREE.GridHelper(200, 50);
-	// scene.add(gridHelper);
-	const axesHelper = new THREE.AxesHelper(50);
-	// scene.add(axesHelper);
-}
-
-function init_sparks(sparks_list, light_position) {
-	for (let i = 0; i < sparks_list.length; i++) {
-		sparks_list[i] = new spark(
-			{ radius: 0.09, width: 3, height: 3 },
-			light_position.map((e) => e),
-			1,
-			{ color: 0xb04125 }
-		);
-		scene.add(sparks_list[i].get());
-	}
-}
-
 init_sparks(left_torch_sparks, left_light_position);
 init_sparks(right_torch_sparks, right_light_position);
 init_models();
@@ -227,43 +225,6 @@ init_lights();
 init_helpers();
 init_floor();
 
-function getScrollPercent() {
-	var h = document.documentElement,
-		b = document.body,
-		st = 'scrollTop',
-		sh = 'scrollHeight';
-	var res = ((h[st] || b[st]) / ((h[sh] || b[sh]) - h.clientHeight)) * 100;
-	document.getElementById('scroll_percentage').innerHTML = res;
-	return res;
-}
-
-/**
- * moves the camera along the dolly following a scroll action
- * @author EW
- * @date 2023-01-15
-//  */
-// function moveCamera() {
-// 	const scroll_p = getScrollPercent();
-// 	const t = scroll_p / (100 / camera_dolly.curve_count);
-
-// 	if (1 < camera_dolly.curve_count && !STOP) {
-// 		let camera_position = camera_dolly.move_camera(frame / 100);
-// 		camera.position.copy(camera_position[0]);
-// 		let camera_focus = view_dolly.move_camera(frame / 100);
-// 		camera.lookAt(camera_focus[1]);
-// 		// console.log(t_delta, CAMERA_POSITIONS[Math.floor(t)].name,t_delta > view_epsilon)
-// 	}
-// }
-
-// moveCamera();
-// document.body.onscroll = moveCamera;
-
-/**
- * desc
- * @author asdasd
- * @date 2023-01-14
- * @param { * } intensity
- */
 function light_flicker(intensity) {
 	return (
 		(Math.random(torch_max_intensity) + intensity * (Math.random(3) + 0.5)) %
@@ -271,26 +232,29 @@ function light_flicker(intensity) {
 	);
 }
 
-function update_light(light, sparks) {
-	const L = light_flicker(light.intensity);
-	light.intensity = L;
-	light.distance = L + 10;
+function animate_flame(light, sparks = []) {
+	const old_intensity = light.intensity;
+	const new_intensity = light_flicker(old_intensity);
+	light.intensity = (new_intensity + old_intensity) / 2;
+	light.distance = new_intensity + 10;
 	sparks.forEach((e) => {
-		e.wiggle(L);
+		e.wiggle(new_intensity);
 	});
 }
 
 const motion_dolly = new dolly([
-	[t_D.x * 1, t_D.height, t_D.z * 1],
-	[t_D.x * 1, t_D.height + 2, t_D.z * -1],
-	[t_D.x * -1, t_D.height + 1, t_D.z * -1],
-	[t_D.x * -1, t_D.height + 3, t_D.z * 1],
+	[t_D.x * 1, t_D.height + THREE.MathUtils.randFloat(0, 2), t_D.z * 1],
+	[t_D.x * 1, t_D.height + THREE.MathUtils.randFloat(0, 2), t_D.z * -1],
+	[t_D.x * -1, t_D.height + THREE.MathUtils.randFloat(0, 2), t_D.z * -1],
+	[t_D.x * -1, t_D.height + THREE.MathUtils.randFloat(0, 2), t_D.z * 1],
 ]);
 const md_draw = motion_dolly.draw({ color: 0xffffff });
 
 const FOCALS = [];
 MODELS.forEach((e) => {
-	FOCALS.push(e.position);
+	if (e.focusable) {
+		FOCALS.push(e.position);
+	}
 });
 const focal_dolly = new dolly(FOCALS);
 const fd_draw = focal_dolly.draw();
@@ -306,59 +270,89 @@ const mat2 = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 const inner_sphere = new THREE.Mesh(inner_box, mat2);
 scene.add(inner_sphere);
 
-const outer_light = new THREE.PointLight(0xff0000, 50, 10);
-outer_light.castShadow = true;
-scene.add(outer_light);
+const follow_light = new THREE.PointLight(0xff0000, 50, 10);
+follow_light.castShadow = false;
+scene.add(follow_light);
+
+LIGHTS.push(follow_light);
 
 let draw_dollys = true;
-document.getElementById('show_wires').addEventListener('click', () => {
-	if (draw_dollys) {
-		scene.add(md_draw);
-		scene.add(fd_draw);
-	} else {
-		scene.remove(md_draw);
-		scene.remove(fd_draw);
-	}
-	draw_dollys = !draw_dollys;
-});
 
 // const inner_light = new THREE.
 
-let frame2 = 0;
 //!box3 is bounding box
 function animate() {
-	frame = (frame += 1) % 1000;
-	frame2 = (frame2 += 1) % 12000;
+	ELAPSED_TIME += 1;
+	const camera_time = ELAPSED_TIME % camera_loop_time;
+	const focus_time = ELAPSED_TIME % focus_loop_time;
 
-	let camera_position = motion_dolly.get_position(frame, 1000);
+	let camera_position = motion_dolly.get_position(
+		camera_time,
+		camera_loop_time
+	);
 	const old_length = camera_position.length();
 	const e = new THREE.Vector3();
 	e.copy(camera_position);
 	e.setLength(old_length + 3);
-	camera_position = motion_dolly.get_position(frame, 1000);
-	const camera_focus_point = focal_dolly.get_position(frame2, 12000);
-	outer_light.position.x = camera_focus_point.x;
-	outer_light.position.y = camera_focus_point.y + 0.5;
-	outer_light.position.z = camera_focus_point.z;
+	camera_position = motion_dolly.get_position(camera_time, camera_loop_time);
+	const camera_focus_point = focal_dolly.get_position(
+		focus_time,
+		focus_loop_time
+	);
+	follow_light.position.x = camera_focus_point.x;
+	follow_light.position.y = camera_focus_point.y + 2;
+	follow_light.position.z = camera_focus_point.z;
 	outer_cube.position.x = camera_focus_point.x;
 	outer_cube.position.y = camera_focus_point.y;
 	outer_cube.position.z = camera_focus_point.z;
 	inner_sphere.position.x = camera_focus_point.x;
-	inner_sphere.position.y = camera_focus_point.y + 0.25;
+	inner_sphere.position.y = camera_focus_point.y + 2;
 	inner_sphere.position.z = camera_focus_point.z;
-	if (!STOP) {
+	if (!FREE_CAM) {
 		camera.position.copy(e);
 		camera.lookAt(camera_focus_point);
 	}
-	if (frame % 2 == 0) {
-		update_light(leftLight, left_torch_sparks);
+	if (ELAPSED_TIME % 2 == 0) {
+		animate_flame(leftLight, left_torch_sparks);
+		animate_flame(follow_light);
 	}
-	if (frame2 % 2 == 0) {
-		update_light(rightLight, right_torch_sparks);
+	if (focus_time % 2 == 0) {
+		animate_flame(rightLight, right_torch_sparks);
 	}
 	requestAnimationFrame(animate);
 	composer.render();
 }
-//render loop, everytime scene is redrawn is called
+
 window.addEventListener('resize', onWindowResize, false);
+const show_wires_button = document.getElementById('show_wires');
+show_wires_button.addEventListener('click', (e) => {
+	if (draw_dollys) {
+		scene.add(md_draw);
+		scene.add(fd_draw);
+		show_wires_button.innerHTML = 'HIDE WIRES';
+	} else {
+		scene.remove(md_draw);
+		scene.remove(fd_draw);
+		show_wires_button.innerHTML = 'SHOW WIRES';
+	}
+	draw_dollys = !draw_dollys;
+});
+const free_cam_button = document.getElementById('free_cam');
+free_cam_button.addEventListener('click', () => {
+	if (!FREE_CAM) {
+		const controls = new OrbitControls(camera, renderer.domElement);
+		camera.position.set(0, 20, 10);
+		controls.update();
+	}
+	FREE_CAM = !FREE_CAM;
+	free_cam_button.innerHTML = FREE_CAM ? 'FOLLOW CAM ' : 'FREE CAM ON';
+});
+const shadow_switch_button = document.getElementById('shadows');
+shadow_switch_button.addEventListener('click', () => {
+	SHADOWS_ON = !SHADOWS_ON;
+	LIGHTS.forEach((e) => {
+		e.castShadow = SHADOWS_ON;
+	});
+	shadow_switch_button.innerHTML = SHADOWS_ON ? 'SHADOWS OFF' : 'SHADOWS ON';
+});
 animate();

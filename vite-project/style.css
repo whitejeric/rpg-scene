@@ -25,6 +25,11 @@ canvas {
 	z-index: 1000;
 }
 
+button {
+	width: 6em;
+	height: 3em;
+}
+
 main {
 	width: 100vw;
 	color: white;

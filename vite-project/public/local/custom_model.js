@@ -3,49 +3,26 @@ import * as THREE from 'three';
 
 const model_folder = './models/';
 const model_library = [
-	'Arrow.glb',
-	'Axe_Small.glb',
-	'Backpack.glb',
 	'Bag.glb',
 	'Bone.glb',
 	'Book.glb',
 	'Chalice.glb',
 	'Chest.glb',
-	'Claymore.glb',
 	'Coin_Pouch.glb',
 	'Crown.glb',
-	'Dagger.glb',
-	'Doublesided_Hammer.glb',
 	'Fish_Bone.glb',
 	'Glove.glb',
 	'Gold_Ingots.glb',
 	'Key-bg6e1lfNsO.glb',
-	'Key-h5nke04hRD.glb',
-	'Key-MUl40QpEvv.glb',
 	'Knife.glb',
 	'Mineral.glb',
-	'Necklace-Jvhs8DCNDZ.glb',
 	'Necklace.glb',
-	'Open_Book-1A07aI9j2d.glb',
-	'Open_Book-JEDMpG0UIR.glb',
-	'Open_Book.glb',
-	'Padlock.glb',
 	'Parchment.glb',
-	'Potion_Bottle-WJxYta4Z96.glb',
 	'Potion_Bottle.glb',
-	'Scythe.glb',
-	'Shield_Celtic_Golden.glb',
-	'Shield_Heater.glb',
-	'Shield_Round.glb',
 	'Skull-ExZmhOIjka.glb',
 	'Skull.glb',
 	'Skull_Coin.glb',
-	'Small_Table.glb',
 	'Star_Coin.glb',
-	'Sword-9lLmH8Et4K.glb',
-	'Sword.glb',
-	'Torch.glb',
-	'Wooden_Bow.glb',
 ];
 
 class custom_model {
@@ -94,35 +71,28 @@ class custom_model {
 		this.name = n;
 		this.focusable = focus;
 	}
-	random(max_scale, max_rotation, bounds) {
+	random(max_scale, max_rotation, bounds, position_spread = 0.6) {
 		this.file =
 			model_folder +
 			model_library[THREE.MathUtils.randInt(0, model_library.length)];
 		this.name = this.file;
-		var scale_factor = THREE.MathUtils.randFloat(0, max_scale);
+		var scale_factor = THREE.MathUtils.randFloat(1, max_scale);
 		this.scale = this.scale.map((e) => e * scale_factor);
 		console.log(scale_factor);
 		var rotation_factor = THREE.MathUtils.degToRad(
 			THREE.MathUtils.randFloat(0, max_rotation)
 		);
 		this.rotation[1] = rotation_factor;
-		var x = THREE.MathUtils.randFloatSpread(bounds.x);
+		var x = bounds.x;
+		// x = x + (x < 0 ? position_spread : -position_spread);
 		var y = bounds.y;
-		var z = THREE.MathUtils.randFloatSpread(bounds.z);
+		var pos_or_neg = THREE.MathUtils.randInt(0, 1);
+		var sign = pos_or_neg > 0 ? -1 : 1;
+		var z =
+			THREE.MathUtils.randFloat(position_spread, bounds.z - position_spread) *
+			sign;
+
 		this.position = [x, y, z];
 	}
 }
 export default custom_model;
-// loader.load( '/models/Small Table.glb',
-//   function ( gltf ) { //onload
-//     let model = gltf.scene;
-//     model.scale.set(5, 5, 5);
-//     model.rotation.set(0, Math.PI/2, 0);
-//     model.position.set(0.5, 0, 0);
-//     scene.add(model)
-//   },
-//   undefined, //onprogress
-//   function ( error ) { //on error
-// 	  console.error( error );
-//   }
-// );
